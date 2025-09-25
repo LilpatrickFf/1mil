@@ -8,6 +8,9 @@ import 'package:solofit/screens/home_screen.dart';
 import 'package:solofit/screens/onboarding/welcome_screen.dart';
 import 'package:provider/provider';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:solofit/screens/onboarding/user_details_screen.dart'; // New import
+import 'package:solofit/services/firestore_service.dart'; // New import
+import 'package:solofit/models/user_profile.dart'; // New import
 
 // Main function to run the app
 void main() async {
@@ -44,6 +47,9 @@ class SoloFitApp extends StatelessWidget {
           create: (context) => context.read<AuthService>().authStateChanges,
           initialData: null,
         ),
+        Provider<FirestoreService>(
+          create: (_) => FirestoreService(),
+        ), // New: Provide FirestoreService
       ],
       child: MaterialApp(
         title: 'SoloFit',
@@ -93,10 +99,25 @@ class AuthWrapper extends StatelessWidget {
   Widget build(BuildContext context) {
     final firebaseUser = context.watch<User?>();
 
-    // If user is logged in, show HomeScreen. Otherwise, show WelcomeScreen.
     if (firebaseUser != null) {
-      return const HomeScreen();
+      // If user is logged in, check if their profile is complete
+      return FutureBuilder<UserProfile?>(
+        future: Provider.of<FirestoreService>(context, listen: false).getUserProfile(firebaseUser.uid),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Scaffold(body: Center(child: CircularProgressIndicator()));
+          }
+          if (snapshot.hasData && snapshot.data?.age != null) {
+            // User has completed onboarding
+            return const HomeScreen();
+          } else {
+            // User has not completed onboarding
+            return const UserDetailsScreen();
+          }
+        },
+      );
     }
+    // If user is not logged in, show WelcomeScreen
     return const WelcomeScreen();
   }
 }
